@@ -5,6 +5,6 @@ conda activate deep-ensembles
 
 for DATASET in mnist cifar caltech eurosat; do
 
-python train_ensemble.py --dataset $DATASET --out $DATASET-ensembles --image-size 32
+python train_ensemble.py --dataset $DATASET --out $DATASET-ensembles --image-size 32 --epochs 10 &
 
 done
