@@ -196,7 +196,7 @@ def experiment(i, train_df, train_labels, val_df, val_labels):
             threshold_accuracy = accuracy[torch.argwhere(probs > threshold)]
 
             all_records.append({
-                "Dataset": "Donors Choose",
+                "Dataset": f"Donors Choose (Split = {i})",
                 "Ensemble Size": ensemble_size,
                 "Confidence Threshold": threshold,
                 "Validation Accuracy": threshold_accuracy.mean().cpu().numpy().item(),
