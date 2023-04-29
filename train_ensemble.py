@@ -10,6 +10,10 @@ import argparse
 import random
 import numpy as np
 import os
+import ssl
+
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 DATASETS = {
@@ -26,15 +30,15 @@ if __name__ == "__main__":
 
     parser.add_argument("--dataset", type=str, default="mnist", choices=DATASETS.keys())
 
-    parser.add_argument("--num-classes", type=int, default=10)
+    parser.add_argument("--num-classes", type=int, default=1000)
 
     parser.add_argument("--seed", type=int, default=0)
 
-    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--epochs", type=int, default=10)
 
-    parser.add_argument("--ensemble-size", type=int, default=32)
+    parser.add_argument("--ensemble-size", type=int, default=10)
 
-    parser.add_argument("--image-size", type=int, default=28)
+    parser.add_argument("--image-size", type=int, default=32)
     parser.add_argument("--batch-size", type=int, default=128)
 
     parser.add_argument("--out", type=str, default="mnist-ensemble")
@@ -57,16 +61,26 @@ if __name__ == "__main__":
         transforms.Normalize([0.5] * 3, [0.5] * 3),
     ])
 
-    dataset_train = DATASETS[args.dataset](
-        ".", train=True, transform=transform, download=True)
-    dataset_val = DATASETS[args.dataset](
-        ".", train=False, transform=transform, download=True)
+    try:  # attempt to use the official train-val split
+
+        dataset_train = DATASETS[args.dataset](
+            ".", train=True, transform=transform, download=True)
+        dataset_val = DATASETS[args.dataset](
+            ".", train=False, transform=transform, download=True)
+
+    except TypeError:  # manually create one if not available
+
+        dataset_train = DATASETS[args.dataset](
+            ".", transform=transform, download=True)
+
+        dataset_train, dataset_val = \
+            torch.utils.data.random_split(dataset_train, [0.8, 0.2])
 
     dataloader_train = torch.utils.data.DataLoader(
         dataset_train, batch_size=args.batch_size, shuffle=True)
 
     dataset_val = torch.utils.data.DataLoader(
-        dataset_val, batch_size=args.batch_size, shuffle=False)
+        dataset_val, batch_size=args.batch_size, shuffle=True)
 
     for ensemble_idx in range(args.ensemble_size):
 
@@ -89,7 +103,7 @@ if __name__ == "__main__":
 
                 loss = F.cross_entropy(predictions, labels)
 
-                loss.mean()
+                loss = loss.mean()
                 loss.backward()
 
                 optim.step()
@@ -101,8 +115,8 @@ if __name__ == "__main__":
 
                 if (iteration + 1) % 50 == 0:
 
-                    print("Ensemble {:02d}  Iteration {:05d}  Training Accuracy: {:0.5f}".format(
-                        ensemble_idx, iteration, torch.cat(
+                    print("[{}] Ensemble {:02d}  Iteration {:05d}  Training Accuracy: {:0.5f}".format(
+                        args.dataset, ensemble_idx, iteration, torch.cat(
                             training_accuracy, dim=0
                         ).float().mean().cpu().numpy().item()))
 
@@ -121,8 +135,8 @@ if __name__ == "__main__":
                     predictions.argmax(dim=-1) == labels
                 )
 
-            print("Ensemble {:02d}  Epoch {:05d}  Validation Accuracy: {:0.5f}".format(
-                ensemble_idx, epoch, torch.cat(
+            print("[{}] Ensemble {:02d}  Epoch {:05d}  Validation Accuracy: {:0.5f}".format(
+                args.dataset, ensemble_idx, epoch, torch.cat(
                     validation_accuracy, dim=0
                 ).float().mean().cpu().numpy().item()))
 
